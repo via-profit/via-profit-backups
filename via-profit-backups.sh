@@ -45,12 +45,14 @@ TOKENS="TLKTRANSFER" # For any additional entry add the appropriate
 # <token-uppercase>_DIR="/path/to/another-dir"     # No '/' at the end of the path!
 # <token-uppercase>_BACKUP_DAY="<weekday-3-letters>"
 
-TLKTRANSFER_BACKUPS_DIR="/home/bablo/backup"   # Where backup files will be saved.
-TLKTRANSFER_DIR="/home/bablo/sample/graphql-server"           # The directory that should be backed up.
-TLKTRANSFER_DATABASE_USER="tlktransfer"        # The databaase user
-TLKTRANSFER_DATABASE_NAME="tlktransfer_server" # The database name
-TLKTRANSFER_DATABASE_PASSWORD="admin"          # The database password
-TLKTRANSFER_BACKUPS_AMOUNT=7                   # The amount of stored backups
+TLKTRANSFER_BACKUPS_DIR="/home/bablo/backup"        # Where backup files will be saved.
+TLKTRANSFER_DIR="/home/bablo/sample/graphql-server" # The directory that should be backed up.
+TLKTRANSFER_DATABASE_USER="tlktransfer"             # The databaase user
+TLKTRANSFER_DATABASE_NAME="tlktransfer_server"      # The database name
+TLKTRANSFER_DATABASE_PASSWORD="admin"               # The database password
+TLKTRANSFER_DATABASE_HOST="localhost"               # The database host
+TLKTRANSFER_DATABASE_PORT="5432"                    # The database port
+TLKTRANSFER_BACKUPS_AMOUNT=7                        # The amount of stored backups
 # TLKTRANSFER_BACKUPS_EXCLUDE_FILE="${TLKTRANSFER_DIR}/.backup.exclude"   # Backup exclude file path, similar as gitignore
 
 # If disk space useage more than 95% then skip backup
@@ -70,17 +72,30 @@ BACKUP_LA_LIMIT=5
 #
 # Parameter:	$1 -> {WIKI, CLOUD, ...}
 check_params() {
-  BACKUPS_DIR="${1}_BACKUPS_DIR"
+  TOKEN_LOWERCASE=$(echo ${1} | tr '[:upper:]' '[:lower:]')
+  BACKUPS_DIR_NAME="${1}_BACKUPS_DIR"
+  BACKUPS_DIR="${!BACKUPS_DIR_NAME}/${TOKEN_LOWERCASE}"
+  BACKUPS_DATABASE_DIR="${!BACKUPS_DIR_NAME}/${TOKEN_LOWERCASE}/db"
   DIR="${1}_DIR"
   BACKUPS_AMOUNT="${1}_BACKUPS_AMOUNT"
 
-  if [ ! -d ${!BACKUPS_DIR} ]; then
-    echo "Creating...${!BACKUPS_DIR}"
-    mkdir -p ${!BACKUPS_DIR}
+  if [ ! -d ${BACKUPS_DIR} ]; then
+    echo "Creating...${BACKUPS_DIR}"
+    mkdir -p ${BACKUPS_DIR}
     if [ ${?} -ne 0 ]; then
-      echo "Error creating ${!BACKUPS_DIR}!"
+      echo "Error creating ${BACKUPS_DIR}!"
       echo "Script will now exit..."
       exit 1
+    fi
+  fi
+
+  if [ ! -d ${BACKUPS_DATABASE_DIR} ]; then
+    echo "Creating...${BACKUPS_DATABASE_DIR}"
+    mkdir -p ${BACKUPS_DATABASE_DIR}
+    if [ ${?} -ne 0 ]; then
+      echo "Error creating ${BACKUPS_DATABASE_DIR}!"
+      echo "Skip database backup..."
+      return 1
     fi
   fi
 
@@ -90,7 +105,7 @@ check_params() {
     exit 2
   fi
 
-  if [ "${!BACKUPS_DIR}" == "${!DIR}" ]; then
+  if [ "${BACKUPS_DIR}" == "${!DIR}" ]; then
     echo "\$${BACKUPS_DIR} and \$${DIR} are the same!"
     echo "Script will now exit..."
     exit 3
@@ -118,7 +133,7 @@ check_params() {
   done
 
   # Checking disk space
-  disk_usage=$(df ${!BACKUPS_DIR} | tail -n1 | tr ' ' '\n' | grep % | cut -f 1 -d %)
+  disk_usage=$(df ${BACKUPS_DIR} | tail -n1 | tr ' ' '\n' | grep % | cut -f 1 -d %)
   if [ "$disk_usage" -ge "$BACKUP_DISK_LIMIT" ]; then
     echo "Not enough disk space"
     echo "Script will now exit..."
@@ -137,8 +152,11 @@ check_params() {
 # Parameter:	$1 -> {WIKI, CLOUD, ...}
 
 make_backup() {
-  BACKUPS_DIR="${1}_BACKUPS_DIR"
+  TOKEN_LOWERCASE=$(echo ${1} | tr '[:upper:]' '[:lower:]')
+  BACKUPS_DIR_NAME="${1}_BACKUPS_DIR"
+  BACKUPS_DIR="${!BACKUPS_DIR_NAME}/${TOKEN_LOWERCASE}"
   DIR="${1}_DIR"
+  DATABASE_NAME="${1}_DATABASE_NAME"
 
   TEMPFILE="$(mktemp /tmp/backup.XXXXXX)"
   PATH_TOKENS=$(echo ${!DIR} | tr "/" " ")
@@ -154,7 +172,7 @@ make_backup() {
 
   if [ -f "${!DIR}/.backup.exclude" ]; then
     echo -e "Backup exlude file was found! ${!DIR}/.backup.exclude \n"
-    tar --exclude-from="${!DIR}/.backup.exclude" -zcf ${TEMPFILE} -C ${PATHTODIR} ./${token} 
+    tar --exclude-from="${!DIR}/.backup.exclude" -zcf ${TEMPFILE} -C ${PATHTODIR} ./${token}
   else
     tar -zcf ${TEMPFILE} -C ${PATHTODIR} ./${token}
   fi
@@ -166,8 +184,71 @@ make_backup() {
     exit 3
   fi
 
+  mv ${TEMPFILE} ${BACKUPS_DIR}/backup_${TOKEN_LOWERCASE}_${TIMESTAMP}.tar.gz
+
+  # make database backup
+  if [ ! -z ${!DATABASE_NAME} ]; then
+    make_database_backup ${1}
+  fi
+}
+
+###################################################################
+#                     make_database_backup()                      #
+###################################################################
+
+# This function performs database backup using creditanils from config
+# Only Postrgesql is supported for this moment
+# _DATABASE_USER - Database user
+# _DATABASE_NAME - Database name
+# _DATABASE_PASSWORD - Database password
+#
+# Parameter:	$1 -> {WIKI, CLOUD, ...}
+make_database_backup() {
   TOKEN_LOWERCASE=$(echo ${1} | tr '[:upper:]' '[:lower:]')
-  mv ${TEMPFILE} ${!BACKUPS_DIR}/backup_${TOKEN_LOWERCASE}_${TIMESTAMP}.tar.gz
+  BACKUPS_DIR_NAME="${1}_BACKUPS_DIR"
+  BACKUPS_DATABASE_DIR="${!BACKUPS_DIR_NAME}/${TOKEN_LOWERCASE}/db"
+  DATABASE_USER="${1}_DATABASE_USER"
+  DATABASE_NAME="${1}_DATABASE_NAME"
+  DATABASE_PASSWORD="${1}_DATABASE_PASSWORD"
+  DATABASE_HOST="${1}_DATABASE_HOST"
+  DATABASE_PORT="${1}_DATABASE_PORT"
+
+  if [ -z ${!DATABASE_PORT} ]; then
+    echo "The length of variable: \$${DATABASE_PORT} is 0 (zero)!"
+    echo "Skip database backup..."
+    return 1
+  fi
+
+  if [ -z ${!DATABASE_HOST} ]; then
+    echo "The length of variable: \$${DATABASE_HOST} is 0 (zero)!"
+    echo "Skip database backup..."
+    return 1
+  fi
+
+  if [ -z ${!DATABASE_PASSWORD} ]; then
+    echo "The length of variable: \$${DATABASE_PASSWORD} is 0 (zero)!"
+    echo "Skip database backup..."
+    return 1
+  fi
+
+  if [ -z ${!DATABASE_NAME} ]; then
+    echo "The length of variable: \$${DATABASE_NAME} is 0 (zero)!"
+    echo "Skip database backup..."
+    return 1
+  fi
+
+  if [ -z ${!DATABASE_USER} ]; then
+    echo "The length of variable: \$${DATABASE_USER} is 0 (zero)!"
+    echo "Skip database backup..."
+    return 1
+  fi
+
+  echo -e "\nBacking up ${!DATABASE_NAME} ..."
+  echo -e "This might also take some time!\n"
+
+  pg_dump --dbname="postgresql://${!DATABASE_USER}:${!DATABASE_PASSWORD}@${!DATABASE_HOST}:${!DATABASE_PORT}/${!DATABASE_NAME}" | gzip -9 >${BACKUPS_DATABASE_DIR}/backup_db_${TOKEN_LOWERCASE}_${TIMESTAMP}.sql.gz
+
+  return 0
 }
 
 ###################################################################
@@ -201,55 +282,77 @@ compare_dates() {
 #                        check_backups()                          #
 ###################################################################
 
-# Does all the job.
-# 	- Checks if a backup was taken this week.
-#	- Checks if a any backups were taken the last 6 weeks.
-#	- If today is "<token-uppercase>_BACKUP_DAY" a backup is taken.
-#	- If no backups were taken this week or the preview one,
-#	  a backup is taken.
-#	- If the total number of backups is more than 5 (>=6),
-#	  excess backups which are older than 5 weeks are deleted.
-#	  (counting current week in those 5)
+# Does all the job..
+#	- Checks if a any backups were taken the last X days from config. Number of backups taken from _BACKUPS_AMOUNT parametr.
+#	- Older backup would be deleted
 # Parameter:	$1 -> {WIKI, CLOUD, ...}
 check_backups() {
   TOKEN_LOWERCASE=$(echo ${1} | tr '[:upper:]' '[:lower:]')
-  BACKUPS_DIR="${1}_BACKUPS_DIR"
+  BACKUPS_DIR_NAME="${1}_BACKUPS_DIR"
+  BACKUPS_DIR="${!BACKUPS_DIR_NAME}/${TOKEN_LOWERCASE}"
   BACKUPS_AMOUNT="${1}_BACKUPS_AMOUNT"
-  BACKUP_FILES=$(ls -1 ${!BACKUPS_DIR} | grep -E \
+  DATABASE_NAME="${1}_DATABASE_NAME"
+  BACKUP_FILES=$(ls -1 ${BACKUPS_DIR} | grep -E \
     "^backup_${TOKEN_LOWERCASE}_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}.tar.gz" \
+    2>/dev/null | sort -r)
+  BACKUPS_DATABASE_DIR="${!BACKUPS_DIR_NAME}/${TOKEN_LOWERCASE}/db"
+  BACKUP_DATABASE_FILES=$(ls -1 ${BACKUPS_DATABASE_DIR} | grep -E \
+    "^backup_db_${TOKEN_LOWERCASE}_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}.sql.gz" \
     2>/dev/null | sort -r)
 
   TODAY=$(date +%a)
   FILENUM_SUM=0
+  FILENUM_DATABASE_SUM=0
   DELETED_SUM=0
-  TO_REMOVE_BACKUP_DATE=$(date --date="${!BACKUPS_AMOUNT} days ago" +"%Y-%m-%d")
+  DELETED_DATABASE_SUM=0
+  TO_REMOVE_BACKUP_DATE=$(date --date="${!BACKUPS_AMOUNT} days ago" "+%Y-%m-%d_%H-%M-%S")
 
   echo -e "\n##### $1\n"
 
+  # Check previous backup files dates and drop it if backup date greather than amount of days stored in _BACKUPS_AMOUNT
   for file in ${BACKUP_FILES}; do
     BACKUP_TIME=${file:(-26):19}
-    echo $BACKUP_TIME
+    echo -e "\t${file}"
+    ((FILENUM++))
 
-    compare_dates ${BACKUP_TIME} ${SUN}
+    compare_dates ${BACKUP_TIME} ${TO_REMOVE_BACKUP_DATE}
     x=${?}
-    compare_dates ${BACKUP_TIME} ${MON}
-    y=${?}
-    if [ ${x} -le 1 ] && [ ${y} -eq 2 -o ${y} -eq 0 ]; then
-      echo -e "\t${file}"
-      ((FILENUM++))
+    if [ ${x} -le 1 ]; then
+      echo -e "\t[rm ${BACKUPS_DIR}/${file}]"
 
-      if [ ${week} -eq 6 ] && [ $((FILENUM_SUM + FILENUM)) -gt 5 ]; then
-        echo -e "\t[rm ${!BACKUPS_DIR}/${file}]"
-        rm ${!BACKUPS_DIR}/${file}
-        ((DELETED_SUM++))
-      fi
+      # Drop expired backups
+      rm ${BACKUPS_DIR}/${file}
+
+      ((DELETED_SUM++))
     fi
   done
+
+  # Then do the same for the database files
+  if [ ! -z ${!DATABASE_NAME} ]; then
+    for bfile in ${BACKUP_DATABASE_FILES}; do
+      BACKUP_TIME=${bfile:(-26):19}
+      echo -e "\t${bfile}"
+      ((FILENUM_DATABASE++))
+
+      compare_dates ${BACKUP_TIME} ${TO_REMOVE_BACKUP_DATE}
+      x=${?}
+      if [ ${x} -le 1 ]; then
+        echo -e "\t[rm ${BACKUPS_DATABASE_DIR}/${bfile}]"
+
+        # Drop expired backups
+        rm ${BACKUPS_DATABASE_DIR}/${bfile}
+
+        ((DELETED_DATABASE_SUM++))
+      fi
+    done
+
+  fi
 
   make_backup ${1}
   ((FILENUM++))
 
   ((FILENUM_SUM += FILENUM))
+  ((FILENUM_DATABASE_SUM += FILENUM_DATABASE))
 
   if [ ${FILENUM} -eq 0 ]; then
     echo -e "\tNo backup files were found!"
@@ -263,6 +366,10 @@ check_backups() {
   echo "${FILENUM_SUM} ${2} backup file(s) exist!"
   echo "${DELETED_SUM} ${2} backup file(s) were deleted!"
   echo "$((FILENUM_SUM - DELETED_SUM)) ${2} OLD backup file(s) currently exist!"
+  echo "===== DATABASE ====="
+  echo "${FILENUM_DATABASE_SUM} ${2} database backup file(s) exist!"
+  echo "${DELETED_DATABASE_SUM} ${2} backup file(s) were deleted!"
+  echo "$((FILENUM_DATABASE_SUM - DELETED_DATABASE_SUM)) ${2} OLD backup database file(s) currently exist!"
 }
 
 ###################################################################
