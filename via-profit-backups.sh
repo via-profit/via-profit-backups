@@ -154,7 +154,7 @@ make_backup() {
 
   if [ -f "${!DIR}/.backup.exclude" ]; then
     echo -e "Backup exlude file was found! ${!DIR}/.backup.exclude \n"
-    tar -zcf ${TEMPFILE} --exclude-from="${!DIR}/.backup.exclude" -C ${PATHTODIR} ./${token} 
+    tar --exclude-from="${!DIR}/.backup.exclude" -zcf ${TEMPFILE} -C ${PATHTODIR} ./${token} 
   else
     tar -zcf ${TEMPFILE} -C ${PATHTODIR} ./${token}
   fi
