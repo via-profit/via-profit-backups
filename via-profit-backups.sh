@@ -251,8 +251,8 @@ check_backups() {
     2>/dev/null | sort -r)
 
   TODAY=$(date +%a)
-  FILENUM_SUM=0
-  FILENUM_DATABASE_SUM=0
+  FILENUM=0
+  FILENUM_DATABASE=0
   DELETED_SUM=0
   DELETED_DATABASE_SUM=0
   TO_REMOVE_BACKUP_DATE=$(date --date="${!BACKUPS_AMOUNT} days ago" "+%Y-%m-%d_%H-%M-%S")
@@ -309,8 +309,6 @@ check_backups() {
     ((FILENUM_DATABASE++))
   fi
 
-  ((FILENUM_SUM += FILENUM))
-  ((FILENUM_DATABASE_SUM += FILENUM_DATABASE))
 
   if [ ${FILENUM} -eq 0 ]; then
     echo -e "\tNo backup files were found!"
@@ -321,13 +319,13 @@ check_backups() {
 
   echo " "
   echo "===== REPORT ====="
-  echo "${FILENUM_SUM} ${2} backup file(s) exist!"
+  echo "${FILENUM} ${2} backup file(s) exist!"
   echo "${DELETED_SUM} ${2} backup file(s) were deleted!"
-  echo "$((FILENUM_SUM - DELETED_SUM)) ${2} OLD backup file(s) currently exist!"
+  echo "$((FILENUM - DELETED_SUM)) ${2} OLD backup file(s) currently exist!"
   echo "===== DATABASE ====="
-  echo "${FILENUM_DATABASE_SUM} ${2} database backup file(s) exist!"
+  echo "${FILENUM_DATABASE} ${2} database backup file(s) exist!"
   echo "${DELETED_DATABASE_SUM} ${2} backup file(s) were deleted!"
-  echo "$((FILENUM_DATABASE_SUM - DELETED_DATABASE_SUM)) ${2} OLD backup database file(s) currently exist!"
+  echo "$((FILENUM_DATABASE - DELETED_DATABASE_SUM)) ${2} OLD backup database file(s) currently exist!"
 }
 
 ###################################################################
