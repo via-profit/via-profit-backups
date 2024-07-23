@@ -18,49 +18,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 TIMESTAMP=$(date "+%Y-%m-%d_%H-%M-%S")
-DAYS=(Mon Tue Wed Thu Fri Sat Sun)
 
-###################################################################
-#                    CONFIGURATION SECTION                        #
-###################################################################
-
-# The configuration section is the only section you should modify,
-# unless you really(!) know what you are doing!!!
-
-# Make sure to always comply with the name format of the variables
-# below. As you may have noticed, all variables related to each
-# other begin with the same token (i.e. WIKI, CLOUD, ...).
-
-# To add any additional directories to be backed up, you should only
-# add three (3) new lines and modify ${TOKENS} variable. See the
-# examples below to get a better understanding.
-
-# Example of ${TOKENS} variable.
-TOKENS="TLKTRANSFER" # For any additional entry add the appropriate
-# <token-uppercase> separating it with a space
-# character from existing tokens.
-
-# Template - The three lines that should be added for every new directory addition.
-# <token-uppercase>_BACKUPS_DIR="/path/to/dir"     # No '/' at the end of the path!
-# <token-uppercase>_DIR="/path/to/another-dir"     # No '/' at the end of the path!
-# <token-uppercase>_BACKUP_DAY="<weekday-3-letters>"
-
-TLKTRANSFER_BACKUPS_DIR="/home/bablo/backup"        # Where backup files will be saved.
-TLKTRANSFER_DIR="/home/bablo/sample/graphql-server" # The directory that should be backed up.
-TLKTRANSFER_DATABASE_USER="tlktransfer"             # The databaase user
-TLKTRANSFER_DATABASE_NAME="tlktransfer_server"      # The database name
-TLKTRANSFER_DATABASE_PASSWORD="admin"               # The database password
-TLKTRANSFER_DATABASE_HOST="localhost"               # The database host
-TLKTRANSFER_DATABASE_PORT="5432"                    # The database port
-TLKTRANSFER_BACKUPS_AMOUNT=7                        # The amount of stored backups
-# TLKTRANSFER_BACKUPS_EXCLUDE_FILE="${TLKTRANSFER_DIR}/.backup.exclude"   # Backup exclude file path, similar as gitignore
-
-# If disk space useage more than 95% then skip backup
-BACKUP_DISK_LIMIT=95
-
-# If load average more than 5 then skip backup
-BACKUP_LA_LIMIT=5
-
+. ./.env
 ###################################################################
 #                          check_config()                         #
 ###################################################################
@@ -78,6 +37,7 @@ check_params() {
   BACKUPS_DATABASE_DIR="${!BACKUPS_DIR_NAME}/${TOKEN_LOWERCASE}/db"
   DIR="${1}_DIR"
   BACKUPS_AMOUNT="${1}_BACKUPS_AMOUNT"
+  DATABASE_NAME="${1}_DATABASE_NAME"
 
   if [ ! -d ${BACKUPS_DIR} ]; then
     echo "Creating...${BACKUPS_DIR}"
@@ -89,7 +49,7 @@ check_params() {
     fi
   fi
 
-  if [ ! -d ${BACKUPS_DATABASE_DIR} ]; then
+  if [ ! -d ${BACKUPS_DATABASE_DIR} ] && [ ! -z ${!DATABASE_NAME} ]; then
     echo "Creating...${BACKUPS_DATABASE_DIR}"
     mkdir -p ${BACKUPS_DATABASE_DIR}
     if [ ${?} -ne 0 ]; then
@@ -156,7 +116,6 @@ make_backup() {
   BACKUPS_DIR_NAME="${1}_BACKUPS_DIR"
   BACKUPS_DIR="${!BACKUPS_DIR_NAME}/${TOKEN_LOWERCASE}"
   DIR="${1}_DIR"
-  DATABASE_NAME="${1}_DATABASE_NAME"
 
   TEMPFILE="$(mktemp /tmp/backup.XXXXXX)"
   PATH_TOKENS=$(echo ${!DIR} | tr "/" " ")
@@ -185,11 +144,6 @@ make_backup() {
   fi
 
   mv ${TEMPFILE} ${BACKUPS_DIR}/backup_${TOKEN_LOWERCASE}_${TIMESTAMP}.tar.gz
-
-  # make database backup
-  if [ ! -z ${!DATABASE_NAME} ]; then
-    make_database_backup ${1}
-  fi
 }
 
 ###################################################################
@@ -295,10 +249,6 @@ check_backups() {
   BACKUP_FILES=$(ls -1 ${BACKUPS_DIR} | grep -E \
     "^backup_${TOKEN_LOWERCASE}_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}.tar.gz" \
     2>/dev/null | sort -r)
-  BACKUPS_DATABASE_DIR="${!BACKUPS_DIR_NAME}/${TOKEN_LOWERCASE}/db"
-  BACKUP_DATABASE_FILES=$(ls -1 ${BACKUPS_DATABASE_DIR} | grep -E \
-    "^backup_db_${TOKEN_LOWERCASE}_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}.sql.gz" \
-    2>/dev/null | sort -r)
 
   TODAY=$(date +%a)
   FILENUM_SUM=0
@@ -327,8 +277,16 @@ check_backups() {
     fi
   done
 
+  make_backup ${1}
+  ((FILENUM++))
+
   # Then do the same for the database files
   if [ ! -z ${!DATABASE_NAME} ]; then
+    BACKUPS_DATABASE_DIR="${!BACKUPS_DIR_NAME}/${TOKEN_LOWERCASE}/db"
+    BACKUP_DATABASE_FILES=$(ls -1 ${BACKUPS_DATABASE_DIR} | grep -E \
+      "^backup_db_${TOKEN_LOWERCASE}_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}.sql.gz" \
+      2>/dev/null | sort -r)
+
     for bfile in ${BACKUP_DATABASE_FILES}; do
       BACKUP_TIME=${bfile:(-26):19}
       echo -e "\t${bfile}"
@@ -346,10 +304,10 @@ check_backups() {
       fi
     done
 
+    # Make backup of Database
+    make_database_backup ${1}
+    ((FILENUM_DATABASE++))
   fi
-
-  make_backup ${1}
-  ((FILENUM++))
 
   ((FILENUM_SUM += FILENUM))
   ((FILENUM_DATABASE_SUM += FILENUM_DATABASE))
