@@ -22,7 +22,7 @@ $ cd via-profit-backups
 $ cp ./.env.example .env
 ```
 
-3. Modify config .env file using given tips. Set up `$TOKENS` variable and fill settings in the section below
+3. Modify config `.env` file using given tips. Set up `$TOKENS` variable and fill settings in the section below
 
 4. If you want to exclude some files from the backup. Copy and paste `.backup.exclude.example` into the folder where you will be backing up. Rename this file to `.backup.exclude`. And write down in a file the names of the directories/files you want to exclude
 
@@ -33,12 +33,14 @@ $ cp ./.backup.exclude.example ~/the/backing/up/folder/.env
 And we are ready to go
 
 ## Running
+### Manual running
 This script is designed to work with crontab, but you can run it manually by running the command in the console.
 
 ```bash
 $ sh ./via-profit-backup.sh
 ```
 
+### Crontab running
 If you want that script makes automatic backup you should create a crontab task by running
 ```bash
     
