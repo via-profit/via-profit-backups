@@ -76,8 +76,6 @@ init_logging() {
     compare_dates ${BACKUP_TIME} ${TO_REMOVE_LOG_TIMESTAMP}
     x=${?}
     if [ ${x} -le 1 ]; then
-      echo -e "\t[rm ${BACKUP_LOG_FOLDER}/${file}]"
-
       # Drop expired backups
       rm ${BACKUP_LOG_FOLDER}/${file}
     fi
