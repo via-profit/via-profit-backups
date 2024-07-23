@@ -45,7 +45,7 @@ compare_dates() {
 init_logging() {
 
   LOG_TIMESTAMP=$(date "+%Y-%m")
-  TO_REMOVE_LOG_TIMESTAMP=$(date --date="5 month ago" "+%Y-%m")
+  TO_REMOVE_LOG_TIMESTAMP=$(date --date="${BACKUP_LOG_MONTH_AMOUNT} month ago" "+%Y-%m")
   DEFAULT_LOG_FOLDER="./log"
   BACKUP_LOG_FOLDER="${BACKUP_LOG_ROOT_FOLDER:-$DEFAULT_LOG_FOLDER}"
 
