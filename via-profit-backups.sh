@@ -1,5 +1,104 @@
 #!/bin/bash
 
+if ! [ -f ./.env ]; then
+  echo "Error. environment file ./.env does not exists"
+  echo "Script will now exit..."
+  exit 1
+fi
+
+# import environment file
+. ./.env
+
+
+###################################################################
+#                          compare_dates()                        #
+###################################################################
+
+# Compares the dates which are extracted from the two (2) timestamps
+# given as function parameters.
+# Return value:	'0' - if date0 = date1
+#          	'1' - if date0 < date1
+#          	'2' - if date0 > date1
+#
+# Parameters:	$1 -> Timestamp #0
+#		$2 -> Timestamp #1
+#
+# The format of Timestamp #0 and #1 matches the template of ${TIMESTAMP}.
+# i.e. 2016-06-20_11-50-20
+compare_dates() {
+  d0=${1::10}
+  d1=${2::10}
+
+  if [ "${d0}" \< "${d1}" ]; then
+    return 1
+  elif [ "${d0}" \> "${d1}" ]; then
+    return 2
+  fi
+  return 0
+}
+
+###################################################################
+#                          init_logging()                         #
+###################################################################
+
+# This function initialize log files and promts stdin of this script to this file
+init_logging() {
+
+  LOG_TIMESTAMP=$(date "+%Y-%m")
+  TO_REMOVE_LOG_TIMESTAMP=$(date --date="5 month ago" "+%Y-%m")
+  BACKUP_LOG_FOLDER=${BACKUP_LOG_ROOT_FOLDER}/via-profit-backups
+
+  # Create log folder if not exists
+  if [ ! -d ${BACKUP_LOG_FOLDER} ]; then
+    # echo "Creating...${BACKUP_LOG_FOLDER}"
+    mkdir -p ${BACKUP_LOG_FOLDER}
+    if [ ${?} -ne 0 ]; then
+      BACKUP_LOG_FOLDER='./log'
+      if [ ! -d ${BACKUP_LOG_FOLDER} ]; then
+        mkdir -p ${BACKUP_LOG_FOLDER}
+        if [ ${?} -ne 0 ]; then
+          echo "Error creating ${BACKUP_LOG_FOLDER}!"
+          echo "Script will now exit..."
+          exit 1
+        fi
+      fi
+    fi
+  fi
+
+  BACKUP_LOG_FILES=$(ls -1 ${BACKUP_LOG_FOLDER} | grep -E \
+    "^backup_[0-9]{4}-[0-9]{2}.log" \
+    2>/dev/null | sort -r)
+
+  # Clear old log files
+  for file in ${BACKUP_LOG_FILES}; do
+    BACKUP_TIME=${file:(-11):7}
+
+    compare_dates ${BACKUP_TIME} ${TO_REMOVE_LOG_TIMESTAMP}
+    x=${?}
+    if [ ${x} -le 1 ]; then
+      echo -e "\t[rm ${BACKUP_LOG_FOLDER}/${file}]"
+
+      # Drop expired backups
+      rm ${BACKUP_LOG_FOLDER}/${file}
+    fi
+  done
+
+  #Compile path of log file
+  BACKUP_LOG_FILE=${BACKUP_LOG_FOLDER}/backup_${LOG_TIMESTAMP}.log
+
+  # Create log file if not exists
+  if [ ! -f $BACKUP_LOG_FILE ]; then
+    touch $BACKUP_LOG_FILE
+  fi
+
+  # promt stdin & stderr to log file
+  exec 3>&1 4>&2
+  trap 'exec 2>&4 1>&3' 0 1 2 3
+  exec 1>${BACKUP_LOG_FILE} 2>&1
+}
+
+init_logging
+
 #+-----------------------------------------------------------------------+
 #|              Copyright (C) 2024 LLC Via-profit                        |
 #!              website: https://via-pforit.ru                           |
@@ -19,7 +118,6 @@
 
 TIMESTAMP=$(date "+%Y-%m-%d_%H-%M-%S")
 
-. ./.env
 ###################################################################
 #                          check_config()                         #
 ###################################################################
@@ -205,32 +303,7 @@ make_database_backup() {
   return 0
 }
 
-###################################################################
-#                          compare_dates()                        #
-###################################################################
 
-# Compares the dates which are extracted from the two (2) timestamps
-# given as function parameters.
-# Return value:	'0' - if date0 = date1
-#          	'1' - if date0 < date1
-#          	'2' - if date0 > date1
-#
-# Parameters:	$1 -> Timestamp #0
-#		$2 -> Timestamp #1
-#
-# The format of Timestamp #0 and #1 matches the template of ${TIMESTAMP}.
-# i.e. 2016-06-20_11-50-20
-compare_dates() {
-  d0=${1::10}
-  d1=${2::10}
-
-  if [ "${d0}" \< "${d1}" ]; then
-    return 1
-  elif [ "${d0}" \> "${d1}" ]; then
-    return 2
-  fi
-  return 0
-}
 
 ###################################################################
 #                        check_backups()                          #
@@ -309,13 +382,9 @@ check_backups() {
     ((FILENUM_DATABASE++))
   fi
 
-
   if [ ${FILENUM} -eq 0 ]; then
     echo -e "\tNo backup files were found!"
   fi
-
-  # MON=$(date "+%Y-%m-%d_%H-%M-%S" --date="${MON::10} -1 week")
-  # SUN=$(date "+%Y-%m-%d_%H-%M-%S" --date="${SUN::10} -1 week")
 
   echo " "
   echo "===== REPORT ====="
