@@ -46,14 +46,15 @@ init_logging() {
 
   LOG_TIMESTAMP=$(date "+%Y-%m")
   TO_REMOVE_LOG_TIMESTAMP=$(date --date="5 month ago" "+%Y-%m")
-  BACKUP_LOG_FOLDER=${BACKUP_LOG_ROOT_FOLDER}/via-profit-backups
+  DEFAULT_LOG_FOLDER="./log"
+  BACKUP_LOG_FOLDER="${BACKUP_LOG_ROOT_FOLDER:-$DEFAULT_LOG_FOLDER}"
 
   # Create log folder if not exists
   if [ ! -d ${BACKUP_LOG_FOLDER} ]; then
     # echo "Creating...${BACKUP_LOG_FOLDER}"
     mkdir -p ${BACKUP_LOG_FOLDER}
     if [ ${?} -ne 0 ]; then
-      BACKUP_LOG_FOLDER='./log'
+      BACKUP_LOG_FOLDER=$DEFAULT_LOG_FOLDER
       if [ ! -d ${BACKUP_LOG_FOLDER} ]; then
         mkdir -p ${BACKUP_LOG_FOLDER}
         if [ ${?} -ne 0 ]; then
