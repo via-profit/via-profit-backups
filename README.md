@@ -12,7 +12,7 @@
 ```bash
 $ mkdir ~/utils
 $ cd ~/utils
-$ git clone git@github.com:via-profit/via-profit-backups.git
+$ git clone https://github.com/via-profit/via-profit-backups.git
 $ cd via-profit-backups 
 ```
 
