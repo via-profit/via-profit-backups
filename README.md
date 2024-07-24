@@ -1,6 +1,6 @@
 # Via-profit automatic backup script
 
-- This script performs automatic backups of given folder on any Linux-like OS
+- This script performs automatic backups of given folders on any Linux-like OS
 - Also perform automatic backup of Postgresql database if its needed
 - Automatic backup rotation are included
 - Logging with logs rotation are also included
@@ -30,18 +30,40 @@ $ cp ./.env.example .env
 $ cp ./.backup.exclude.example ~/the/backing/up/folder/.env
 ```
 
+5. Add execution permition to script file by running
+
+```bash
+$ chmod u+x ~/utils/via-profit-backups/via-profit-backups.sh
+```
+
 And we are ready to go
 
 ## Running
 ### Manual running
-This script is designed to work with crontab, but you can run it manually by running the command in the console.
+This script is designed to work with crontab, but you can run it manually by running the command in the console
 
 ```bash
 $ sh ./via-profit-backup.sh
 ```
 
 ### Crontab running
-If you want that script makes automatic backup you should create a crontab task by running
+If you want the script to make automatic backups, you should create a cron job by running
+
 ```bash
-    
+$ crontab -e
 ```
+
+or if you want to backup multiple users you should run this script from `root` user 
+
+```bash
+$ sudo crontab -e
+```
+
+
+Write down a cron job to the opened file
+
+```
+30 02 * * * /bin/bash -c "/home/bablo/Projects/via-profit-backup/via-profit-backups.sh"
+```
+
+> The time pattern is `Minutes Hours Days Month Year`. So `30 02 * * *` Means that script will be running daily at 02:30 

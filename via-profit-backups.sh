@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "$0")"
+
 if ! [ -f ./.env ]; then
   echo "Error. environment file ./.env does not exists"
   echo "Script will now exit..."
@@ -8,7 +10,6 @@ fi
 
 # import environment file
 . ./.env
-
 
 ###################################################################
 #                          compare_dates()                        #
@@ -51,18 +52,11 @@ init_logging() {
 
   # Create log folder if not exists
   if [ ! -d ${BACKUP_LOG_FOLDER} ]; then
-    # echo "Creating...${BACKUP_LOG_FOLDER}"
     mkdir -p ${BACKUP_LOG_FOLDER}
     if [ ${?} -ne 0 ]; then
-      BACKUP_LOG_FOLDER=$DEFAULT_LOG_FOLDER
-      if [ ! -d ${BACKUP_LOG_FOLDER} ]; then
-        mkdir -p ${BACKUP_LOG_FOLDER}
-        if [ ${?} -ne 0 ]; then
-          echo "Error creating ${BACKUP_LOG_FOLDER}!"
-          echo "Script will now exit..."
-          exit 1
-        fi
-      fi
+      echo "Error creating ${BACKUP_LOG_FOLDER}!"
+      echo "Script will now exit..."
+      exit 1
     fi
   fi
 
@@ -96,7 +90,9 @@ init_logging() {
   exec 1>${BACKUP_LOG_FILE} 2>&1
 }
 
-init_logging
+if [ "$BACKUP_LOG_WRITE" = true ]; then
+  init_logging
+fi
 
 #+-----------------------------------------------------------------------+
 #|              Copyright (C) 2024 LLC Via-profit                        |
@@ -301,8 +297,6 @@ make_database_backup() {
 
   return 0
 }
-
-
 
 ###################################################################
 #                        check_backups()                          #
