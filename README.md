@@ -43,7 +43,7 @@ And we are ready to go
 This script is designed to work with crontab, but you can run it manually by running the command in the console
 
 ```bash
-$ sh ./via-profit-backup.sh
+$ sh ./via-profit-backups.sh
 ```
 
 ### Crontab running
