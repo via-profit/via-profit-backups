@@ -24,10 +24,10 @@ $ cp ./.env.example .env
 
 3. Modify config `.env` file using given tips. Set up `$TOKENS` variable and fill settings in the section below
 
-4. If you want to exclude some files from the backup. Copy and paste `.backup.exclude.example` into the folder where you will be backing up. Rename this file to `.backup.exclude`. And write down in a file the names of the directories/files you want to exclude
+4. If you want to exclude some files from the backup. Copy and paste `.backup.exclude.example` into the folder where you will be backing up. Rename this file to `.backup.exclude`. And write down in a file the names of the directories/files you want to exclude. The sctipt will find the exclude file by name `.backup.exclude` and skip all of contained files/folders
 
 ```bash
-$ cp ./.backup.exclude.example ~/the/backing/up/folder/.env
+$ cp ./.backup.exclude.example ~/the/backing/up/folder/.backup.exclude
 ```
 
 5. Add execution permition to script file by running
