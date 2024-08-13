@@ -247,6 +247,37 @@ make_backup() {
 }
 
 ###################################################################
+#                     escape_special_chars()                      #
+###################################################################
+# This function converts special chars into uri entities of a given string
+# This is very useful function to compile postresql connection uri
+#
+# Parameter:	$1 -> string
+escape_special_chars() {
+  str=${1}
+
+  str="${str//' '/%20}"
+  str="${str//'!'/%21}"
+  str="${str//'#'/%23}"
+  str="${str//'$'/%24}"
+  str="${str//'&'/%26}"
+  str="${str//'('/%28}"
+  str="${str//')'/%29}"
+  str="${str//'*'/%2A}"
+  str="${str//'+'/%2B}"
+  str="${str//','/%2C}"
+  str="${str//'-'/%2D}"
+  str="${str//'/'/%2F}"
+  str="${str//':'/%3A}"
+  str="${str//';'/%3B}"
+  str="${str//'?'/%3F}"
+  str="${str//'@'/%40}"
+  str="${str//'.'/%2E}"
+
+  echo $str
+}
+
+###################################################################
 #                     make_database_backup()                      #
 ###################################################################
 
@@ -300,7 +331,11 @@ make_database_backup() {
   echo -e "\nBacking up ${!DATABASE_NAME} ..."
   echo -e "This might also take some time!\n"
 
-  pg_dump --dbname="postgresql://${!DATABASE_USER}:${!DATABASE_PASSWORD}@${!DATABASE_HOST}:${!DATABASE_PORT}/${!DATABASE_NAME}" | gzip -9 >${BACKUPS_DATABASE_DIR}/backup_db_${TOKEN_LOWERCASE}_${TIMESTAMP}.sql.gz
+  escaped_user=$(escape_special_chars ${!DATABASE_USER})
+  escaped_password=$(escape_special_chars ${!DATABASE_PASSWORD})
+  escaped_dbname=$(escape_special_chars ${!DATABASE_NAME})
+
+  pg_dump --dbname="postgresql://${escaped_user}:${escaped_password}@${!DATABASE_HOST}:${!DATABASE_PORT}/${escaped_dbname}" | gzip -9 >${BACKUPS_DATABASE_DIR}/backup_db_${TOKEN_LOWERCASE}_${TIMESTAMP}.sql.gz
 
   return 0
 }
