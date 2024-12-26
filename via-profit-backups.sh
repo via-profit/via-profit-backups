@@ -111,7 +111,7 @@ init_logging() {
   # promt stdin & stderr to log file
   exec 3>&1 4>&2
   trap 'exec 2>&4 1>&3' 0 1 2 3
-  exec 1>${BACKUP_LOG_FILE} 2>&1
+  exec 1>>${BACKUP_LOG_FILE} 2>&1
 }
 
 if [ "$BACKUP_LOG_WRITE" = true ]; then
@@ -217,7 +217,7 @@ make_backup() {
   BACKUPS_DIR="${!BACKUPS_DIR_NAME}/${TOKEN_LOWERCASE}"
   DIR="${1}_DIR"
 
-  TEMPFILE="$(mktemp /tmp/backup.XXXXXX)"
+  TEMPFILE="${BACKUPS_DIR}/backup_${TOKEN_LOWERCASE}_${TIMESTAMP}.tar.gz"
   PATH_TOKENS=$(echo ${!DIR} | tr "/" " ")
 
   for token in ${PATH_TOKENS[@]}; do
@@ -243,7 +243,7 @@ make_backup() {
     exit 3
   fi
 
-  mv ${TEMPFILE} ${BACKUPS_DIR}/backup_${TOKEN_LOWERCASE}_${TIMESTAMP}.tar.gz
+  # mv ${TEMPFILE} ${BACKUPS_DIR}/backup_${TOKEN_LOWERCASE}_${TIMESTAMP}.tar.gz
 }
 
 ###################################################################
